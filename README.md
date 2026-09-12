@@ -4,7 +4,7 @@
 
 **A desktop app that teaches the Kali Linux command line, Python, JavaScript, Node and React — by making you write code that it actually runs and checks.**
 
-[![CI](https://github.com/__GH_OWNER__/__GH_REPO__/actions/workflows/ci.yml/badge.svg)](https://github.com/__GH_OWNER__/__GH_REPO__/actions/workflows/ci.yml)
+[![CI](https://github.com/forrestlasiter/forge/actions/workflows/ci.yml/badge.svg)](https://github.com/forrestlasiter/forge/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-5eead4.svg)](LICENSE)
 [![Electron](https://img.shields.io/badge/Electron-32-47848f.svg)](https://electronjs.org)
 [![Lessons](https://img.shields.io/badge/lessons-29-fbbf24.svg)](docs/CURRICULUM.md)
@@ -50,8 +50,8 @@ needs), then React.
 Built for Kali, works on any Debian-based Linux.
 
 ```bash
-git clone https://github.com/__GH_OWNER__/__GH_REPO__.git
-cd __GH_REPO__
+git clone https://github.com/forrestlasiter/forge.git
+cd forge
 ./install.sh
 ```
 

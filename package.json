@@ -31,5 +31,13 @@
     "jsdom": "^30.0.1",
     "vite": "^5.4.8",
     "wait-on": "^8.0.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forrestlasiter/forge.git"
+  },
+  "homepage": "https://github.com/forrestlasiter/forge#readme",
+  "bugs": {
+    "url": "https://github.com/forrestlasiter/forge/issues"
   }
 }
