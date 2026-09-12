@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+#
+# forge — the launcher.
+#
+# Two jobs beyond "run electron":
+#
+# 1. cd into the app directory. A .desktop launcher starts you in an arbitrary
+#    working directory, and Electron resolves `main` relative to the package
+#    root, so without this the app fails to start from the menu but works fine
+#    from the terminal — a confusing asymmetry.
+#
+# 2. Fall back to --no-sandbox if Chromium's sandbox cannot start. Electron's
+#    sandbox relies on unprivileged user namespaces; some hardened kernels
+#    disable them, and the error ("SUID sandbox helper binary... is not
+#    configured correctly") is opaque. We try the secure way first and only then
+#    fall back, printing why.
+
+set -uo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$HERE"
+
+if [[ ! -d node_modules ]]; then
+  echo "Dependencies are missing. Run ./install.sh first." >&2
+  exit 1
+fi
+if [[ ! -f dist/index.html ]]; then
+  echo "Interface not built yet — building now..." >&2
+  npm run build || exit 1
+fi
+
+ELECTRON="$HERE/node_modules/.bin/electron"
+[[ -x "$ELECTRON" ]] || ELECTRON="npx electron"
+
+OUT="$($ELECTRON . "$@" 2>&1)"
+STATUS=$?
+
+if (( STATUS != 0 )) && grep -qiE 'sandbox|namespace' <<<"$OUT"; then
+  echo "[!] Chromium's sandbox could not start on this kernel; retrying with --no-sandbox." >&2
+  echo "    (Usually means unprivileged user namespaces are disabled.)" >&2
+  exec $ELECTRON . --no-sandbox "$@"
+fi
+
+[[ -n "$OUT" ]] && printf '%s\n' "$OUT"
+exit $STATUS

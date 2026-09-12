@@ -1,0 +1,40 @@
+name: Lesson idea
+description: Suggest a lesson or exercise
+labels: [curriculum]
+body:
+  - type: dropdown
+    id: track
+    attributes:
+      label: Track
+      options:
+        - Kali & the Linux command line
+        - Python from zero
+        - JavaScript & Node
+        - React
+        - A new track
+    validations:
+      required: true
+
+  - type: textarea
+    id: topic
+    attributes:
+      label: What should it teach
+    validations:
+      required: true
+
+  - type: textarea
+    id: trap
+    attributes:
+      label: What is the trap
+      description: >
+        Most lessons here are organised around the specific mistake everyone
+        makes once — `sort()` comparing numbers as strings, the mutable default
+        argument, `start` versus `enable`. What is this lesson's?
+
+  - type: textarea
+    id: exercise
+    attributes:
+      label: How would it be graded
+      description: >
+        What would the learner type, and how would a checker decide they got it
+        right? See CONTRIBUTING.md for the contract.

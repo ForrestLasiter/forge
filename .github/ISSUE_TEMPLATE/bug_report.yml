@@ -1,0 +1,41 @@
+name: Bug report
+description: Something in the app is broken
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If an **exercise cannot be passed** — the checker rejects a correct
+        answer — please say so up front. That is the highest-priority kind of
+        bug in a learning tool, because the learner assumes they are the problem.
+
+  - type: input
+    id: exercise
+    attributes:
+      label: Exercise id (if applicable)
+      description: Shown in the curriculum docs, e.g. `linux/search-pipes/count-failed`
+      placeholder: track/lesson/exercise
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Output of `node -v`, `npm -v`, and your distro / version.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: test-output
+    attributes:
+      label: Output of `npm test`
+      description: Only needed for grading problems.
+      render: shell
