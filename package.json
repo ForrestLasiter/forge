@@ -1,0 +1,35 @@
+{
+  "name": "forge",
+  "version": "1.0.0",
+  "description": "Forge - an offline desktop app that teaches Kali Linux, Python, JavaScript, Node and React by making you actually run code.",
+  "main": "electron/main.js",
+  "author": "Forrest Lasiter",
+  "license": "MIT",
+  "scripts": {
+    "start": "vite build && electron .",
+    "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env FORGE_DEV=1 electron .\"",
+    "build": "vite build",
+    "test": "node scripts/verify-lessons.js",
+    "smoke": "cross-env FORGE_SMOKE=1 electron . --no-sandbox",
+    "screenshots": "cross-env FORGE_SMOKE=1 FORGE_SHOT_DIR=docs/images electron . --no-sandbox",
+    "docs": "node scripts/generate-curriculum-doc.js"
+  },
+  "dependencies": {
+    "@babel/standalone": "^7.25.6",
+    "@codemirror/lang-javascript": "^6.2.2",
+    "@codemirror/lang-python": "^6.1.6",
+    "@uiw/react-codemirror": "^4.23.5",
+    "marked": "^14.1.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^9.0.1",
+    "cross-env": "^7.0.3",
+    "electron": "^32.1.2",
+    "jsdom": "^30.0.1",
+    "vite": "^5.4.8",
+    "wait-on": "^8.0.1"
+  }
+}
