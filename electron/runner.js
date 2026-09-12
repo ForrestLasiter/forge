@@ -97,6 +97,81 @@ function resetWorkspace() {
 }
 
 /**
+ * PATH resolution — why this exists.
+ *
+ * Forge runs your code through `bash -lc`, a LOGIN shell. A login shell sources
+ * /etc/profile, and on Debian and Kali that file sets PATH explicitly — which
+ * can DISCARD entries it inherited from the parent process.
+ *
+ * That breaks a very common setup: Node installed through nvm, fnm or volta
+ * puts its bin directory on PATH from ~/.zshrc. Bash never reads ~/.zshrc at
+ * all, so `bash -lc "node --version"` reports "command not found" on a machine
+ * where `node -v` works perfectly in the user's own terminal. The app then
+ * announces that Node is missing while the terminal two inches away disagrees.
+ *
+ * The fix has two halves:
+ *   1. Compose a PATH from what Electron inherited PLUS the well-known version
+ *      -manager directories, keeping only ones that exist.
+ *   2. Export it INSIDE the command string. The -c command runs after the login
+ *      files have been sourced, so an export there is the last word — whereas
+ *      passing it in `env` alone would be overwritten by /etc/profile.
+ *
+ * Computed once per launch and cached: globbing the home directory on every
+ * single exercise submission would be wasteful.
+ */
+let cachedPath = null;
+
+function candidateBinDirs() {
+  const home = os.homedir();
+  const dirs = [];
+
+  // Version managers install into a per-version directory, so glob for them.
+  const globRoots = [
+    { root: path.join(home, '.nvm', 'versions', 'node'), tail: ['bin'] },
+    { root: path.join(home, '.local', 'share', 'fnm', 'node-versions'), tail: ['installation', 'bin'] },
+    { root: path.join(home, '.nodenv', 'versions'), tail: ['bin'] },
+    { root: path.join(home, '.pyenv', 'versions'), tail: ['bin'] },
+  ];
+  for (const { root, tail } of globRoots) {
+    try {
+      for (const entry of fs.readdirSync(root)) {
+        dirs.push(path.join(root, entry, ...tail));
+      }
+    } catch {
+      /* that manager is not installed — normal */
+    }
+  }
+
+  dirs.push(
+    path.join(home, '.volta', 'bin'),
+    path.join(home, '.bun', 'bin'),
+    path.join(home, '.local', 'bin'),
+    '/usr/local/bin',
+    '/usr/bin',
+    '/bin',
+    '/usr/sbin',
+    '/sbin',
+    '/snap/bin'
+  );
+  return dirs.filter((d) => fs.existsSync(d));
+}
+
+function composedPath() {
+  if (cachedPath) return cachedPath;
+  const inherited = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
+  const seen = new Set();
+  const merged = [];
+  for (const dir of [...inherited, ...candidateBinDirs()]) {
+    if (!seen.has(dir)) {
+      seen.add(dir);
+      merged.push(dir);
+    }
+  }
+  cachedPath = merged.join(path.delimiter);
+  return cachedPath;
+}
+
+/**
  * Run one child process and resolve with everything we learned about it.
  * Never rejects on a non-zero exit — a failing program is a normal outcome in a
  * learning app, not an exception.
@@ -111,7 +186,7 @@ function execute(command, args, { cwd, stdin = '', timeout = DEFAULT_TIMEOUT, en
         // detached puts the child in its own process group, so killing
         // -pid kills the child AND anything it spawned.
         detached: true,
-        env: { ...process.env, ...(env || {}) },
+        env: { ...process.env, PATH: composedPath(), ...(env || {}) },
       });
     } catch (err) {
       return resolve({
@@ -197,7 +272,8 @@ const runNode = (code, opts) => runInterpreted('node', '.js', code, opts);
  * normal Kali terminal. We deliberately do NOT give you a full TTY (see README)
  * — interactive programs like vim or less will not work here, by design.
  */
-const runShell = (command, opts) => execute('bash', ['-lc', command], opts);
+const runShell = (command, opts) =>
+  execute('bash', ['-lc', `export PATH=${JSON.stringify(composedPath())}; ${command}`], opts);
 
 /** Probe which interpreters exist, so the UI can warn instead of failing weirdly. */
 async function probeToolchain() {
@@ -209,7 +285,10 @@ async function probeToolchain() {
   };
   const out = {};
   for (const [name, cmd] of Object.entries(checks)) {
-    const r = await execute('bash', ['-lc', cmd], { timeout: 5000 });
+    // Probe through runShell, NOT execute() directly, so the banner reports the
+    // exact interpreter an exercise will actually get. Probing a different way
+    // than you execute is how a UI ends up confidently wrong.
+    const r = await runShell(cmd, { timeout: 5000 });
     out[name] = { available: r.exitCode === 0, version: (r.stdout || r.stderr).trim().split('\n')[0] };
   }
   return out;

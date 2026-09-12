@@ -2,44 +2,69 @@
 #
 # forge — the launcher.
 #
-# Two jobs beyond "run electron":
+# Three jobs beyond "run electron":
 #
 # 1. cd into the app directory. A .desktop launcher starts you in an arbitrary
 #    working directory, and Electron resolves `main` relative to the package
 #    root, so without this the app fails to start from the menu but works fine
 #    from the terminal — a confusing asymmetry.
 #
-# 2. Fall back to --no-sandbox if Chromium's sandbox cannot start. Electron's
+# 2. Never swallow output. An earlier version captured everything with
+#    OUT="$(...)", which meant a startup crash printed nothing at all when
+#    launched from the application menu: the app simply did not open, with no
+#    clue why. Output now streams to the terminal AND to a log file, so there is
+#    always somewhere to look.
+#
+# 3. Fall back to --no-sandbox if Chromium's sandbox cannot start. Electron's
 #    sandbox relies on unprivileged user namespaces; some hardened kernels
 #    disable them, and the error ("SUID sandbox helper binary... is not
-#    configured correctly") is opaque. We try the secure way first and only then
-#    fall back, printing why.
+#    configured correctly") is opaque.
 
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE"
 
+LOG_DIR="$HOME/.forge"
+LOG="$LOG_DIR/forge.log"
+mkdir -p "$LOG_DIR"
+
+log() { printf '%s\n' "$*" | tee -a "$LOG" >&2; }
+
 if [[ ! -d node_modules ]]; then
-  echo "Dependencies are missing. Run ./install.sh first." >&2
+  log "[x] Dependencies are missing. Run ./install.sh first."
   exit 1
 fi
 if [[ ! -f dist/index.html ]]; then
-  echo "Interface not built yet — building now..." >&2
-  npm run build || exit 1
+  log "[*] Interface not built yet — building now..."
+  npm run build 2>&1 | tee -a "$LOG" || { log "[x] Build failed. See $LOG"; exit 1; }
 fi
 
 ELECTRON="$HERE/node_modules/.bin/electron"
-[[ -x "$ELECTRON" ]] || ELECTRON="npx electron"
-
-OUT="$($ELECTRON . "$@" 2>&1)"
-STATUS=$?
-
-if (( STATUS != 0 )) && grep -qiE 'sandbox|namespace' <<<"$OUT"; then
-  echo "[!] Chromium's sandbox could not start on this kernel; retrying with --no-sandbox." >&2
-  echo "    (Usually means unprivileged user namespaces are disabled.)" >&2
-  exec $ELECTRON . --no-sandbox "$@"
+if [[ ! -x "$ELECTRON" ]]; then
+  log "[x] Electron binary is missing at $ELECTRON"
+  log "    The ~180MB download during 'npm install' probably failed. Fix with:"
+  log "      rm -rf node_modules && npm install"
+  exit 1
 fi
 
-[[ -n "$OUT" ]] && printf '%s\n' "$OUT"
+{
+  printf '\n===== %s =====\n' "$(date -Is)"
+} >> "$LOG"
+
+# PIPESTATUS is why this is not a simple `cmd | tee`: a pipeline's exit status
+# is the LAST command's, which would always be tee's success and hide a crash.
+"$ELECTRON" . "$@" 2>&1 | tee -a "$LOG"
+STATUS=${PIPESTATUS[0]}
+
+if (( STATUS != 0 )) && grep -qiE 'sandbox|namespace' "$LOG"; then
+  log "[!] Chromium's sandbox could not start on this kernel; retrying with --no-sandbox."
+  log "    (Usually means unprivileged user namespaces are disabled.)"
+  "$ELECTRON" . --no-sandbox "$@" 2>&1 | tee -a "$LOG"
+  STATUS=${PIPESTATUS[0]}
+fi
+
+if (( STATUS != 0 )); then
+  log "[x] Forge exited with status $STATUS. Full log: $LOG"
+fi
 exit $STATUS
