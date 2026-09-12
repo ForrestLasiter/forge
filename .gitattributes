@@ -1,0 +1,51 @@
+# Line endings — this file exists because Forge is edited on Windows and run on Linux.
+#
+# THE PROBLEM
+# Windows ends lines with CRLF (\r\n); Linux and macOS use LF (\n). Git for
+# Windows defaults to core.autocrlf=true, which converts LF to CRLF when it
+# writes files into your working directory and back to LF when you commit.
+# That works fine for prose and mostly fine for code — but it breaks two things
+# badly, and both live in this repo:
+#
+#   1. Shell scripts. The kernel reads the shebang line literally, so a stray
+#      \r makes the interpreter path "/usr/bin/env bash\r", which does not
+#      exist. The error is the famous and completely unhelpful:
+#          bash: ./forge: /usr/bin/env: bad interpreter: No such file or directory
+#      ...where the ^M is invisible in most editors. Hours have been lost to it.
+#
+#   2. Any file a checker compares byte-for-byte. Forge's lesson checkers
+#      compare exact output; a trailing \r on a line silently fails a correct
+#      answer.
+#
+# THE FIX
+# `text=auto eol=lf` tells git: detect which files are text, and always write
+# LF into the working directory regardless of platform. It overrides
+# core.autocrlf, so it protects everyone who clones this repo without each of
+# them having to configure anything.
+#
+# If a file already went wrong, `git add --renormalize .` re-applies these
+# rules to the whole tree.
+
+* text=auto eol=lf
+
+# Belt and braces for the files where a CRLF is actually fatal.
+*.sh      text eol=lf
+*.mjs     text eol=lf
+*.js      text eol=lf
+*.jsx     text eol=lf
+*.json    text eol=lf
+*.yml     text eol=lf
+forge     text eol=lf
+
+# Binary files must never be touched by line-ending conversion — "fixing"
+# line endings inside a PNG corrupts it.
+*.png     binary
+*.jpg     binary
+*.ico     binary
+*.gz      binary
+
+# Generated files. `linguist-generated` collapses them in GitHub's diff view
+# and keeps them out of the repository's language statistics, so the language
+# bar reflects code you wrote rather than a 3MB generated index.
+docs/CURRICULUM.md  linguist-generated=true
+package-lock.json   linguist-generated=true
