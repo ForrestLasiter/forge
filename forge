@@ -2,7 +2,7 @@
 #
 # forge — the launcher.
 #
-# Three jobs beyond "run electron":
+# Four jobs beyond "run electron":
 #
 # 1. cd into the app directory. A .desktop launcher starts you in an arbitrary
 #    working directory, and Electron resolves `main` relative to the package
@@ -15,7 +15,16 @@
 #    clue why. Output now streams to the terminal AND to a log file, so there is
 #    always somewhere to look.
 #
-# 3. Fall back to --no-sandbox if Chromium's sandbox cannot start. Electron's
+# 3. Repair PATH before doing anything. The application menu starts you with a
+#    minimal environment — it does not read ~/.zshrc, ~/.bashrc or any login
+#    file — so a Node installed by nvm/fnm/volta is simply absent. That matters
+#    because node_modules/.bin/electron is a #!/usr/bin/env node SHIM, so from
+#    the menu it dies with "env: 'node': No such file or directory" (exit 127)
+#    while working perfectly from your terminal. We add the version-manager
+#    directories back, and prefer Electron's real native binary, which needs no
+#    Node at all.
+#
+# 4. Fall back to --no-sandbox if Chromium's sandbox cannot start. Electron's
 #    sandbox relies on unprivileged user namespaces; some hardened kernels
 #    disable them, and the error ("SUID sandbox helper binary... is not
 #    configured correctly") is opaque.
@@ -24,6 +33,19 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE"
+
+# --- PATH repair (see note 3 above) ----------------------------------------
+for d in \
+  "$HOME"/.nvm/versions/node/*/bin \
+  "$HOME"/.local/share/fnm/node-versions/*/installation/bin \
+  "$HOME"/.nodenv/versions/*/bin \
+  "$HOME"/.volta/bin "$HOME"/.bun/bin "$HOME"/.local/bin \
+  /usr/local/bin /usr/bin /bin /snap/bin
+do
+  [[ -d "$d" ]] || continue
+  case ":$PATH:" in *":$d:"*) ;; *) PATH="$PATH:$d" ;; esac
+done
+export PATH
 
 LOG_DIR="$HOME/.forge"
 LOG="$LOG_DIR/forge.log"
@@ -40,7 +62,10 @@ if [[ ! -f dist/index.html ]]; then
   npm run build 2>&1 | tee -a "$LOG" || { log "[x] Build failed. See $LOG"; exit 1; }
 fi
 
-ELECTRON="$HERE/node_modules/.bin/electron"
+# Prefer the real native binary over node_modules/.bin/electron, which is a
+# Node script and therefore needs `node` on PATH just to start the app.
+ELECTRON="$HERE/node_modules/electron/dist/electron"
+[[ -x "$ELECTRON" ]] || ELECTRON="$HERE/node_modules/.bin/electron"
 if [[ ! -x "$ELECTRON" ]]; then
   log "[x] Electron binary is missing at $ELECTRON"
   log "    The ~180MB download during 'npm install' probably failed. Fix with:"
