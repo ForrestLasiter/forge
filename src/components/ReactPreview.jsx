@@ -11,12 +11,25 @@
  * 2. The compiled output is plain JS referring to `React.createElement`, plus
  *    hook names like `useState`. We build a function from that source with
  *    `new Function(...)`, passing React and the hooks in as arguments — so your
- *    code can use `useState` without an import line, and cannot reach anything
- *    we do not hand it.
+ *    code can use `useState` without an import line.
+ *
+ *    This is a convenience, NOT a sandbox. `new Function` only isolates local
+ *    scope; the code still runs in this renderer's realm and can reach browser
+ *    globals, including `window.forge`. React exercises are therefore trusted
+ *    the same way the shell/python/node tracks are — they run your own code. See
+ *    SECURITY.md. (A true boundary would need a separate realm, e.g. an
+ *    out-of-process frame; that is deliberately not built, because it would not
+ *    change what the learner can already do two tabs over on the Kali track.)
  *
  * 3. We render the resulting component into a real DOM node with its own React
  *    root, wrapped in an error boundary so a crash shows a message instead of
  *    taking the whole app down.
+ *
+ *    A render-time EXCEPTION is caught. A synchronous infinite loop or runaway
+ *    computation (`while (true) {}`) is not — it runs on the renderer's single
+ *    thread with no timeout and will freeze the window until you restart the
+ *    app. The python/node/shell tracks kill runaway processes at 10s; React
+ *    cannot, because it executes in-process. Known limitation (SECURITY.md).
  *
  * 4. Grading runs the shared assertions from shared/assertions.mjs against that
  *    live DOM — clicking real buttons, typing into real inputs.

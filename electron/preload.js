@@ -5,9 +5,14 @@
  * `window`, but the page itself still cannot reach Node. `contextBridge` copies
  * a frozen object onto `window.forge` containing only the functions we list.
  *
- * The rule this enforces: the UI can ask for exactly these nine things and
- * nothing else. If a lesson body ever contained hostile HTML, the worst it could
- * do is call one of these — not open a socket or read /etc/shadow.
+ * The rule this enforces: the page can reach Node only through exactly these
+ * calls and nothing else — it cannot `require()`, open a raw socket, or read an
+ * arbitrary file on its own. That is the contextIsolation boundary doing its job.
+ *
+ * What this does NOT do is sandbox the learner's code. Several of the calls below
+ * (`run`, `shell`) exist precisely to execute code with the user's privileges, so
+ * anything on `window.forge` is reachable by any script in the renderer, learner
+ * JSX included. That is intended: Forge runs your own code. See SECURITY.md.
  *
  * `ipcRenderer.invoke` is the promise-based half of Electron IPC; the other side
  * is `ipcMain.handle` in main.js. Every call below has a matching handler there.

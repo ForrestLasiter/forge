@@ -19,9 +19,15 @@
  * WHY FUNCTIONS NEVER LEAVE THIS FILE:
  * Electron's IPC serialises messages with the structured clone algorithm, which
  * cannot clone a function. So `toSerialisable()` strips `check` before the
- * curriculum is sent to the React UI, and grading always happens here in the
- * main process. That is also the safe design: the UI can never be tricked into
- * marking itself complete.
+ * curriculum is sent to the React UI, and grading for shell/python/node happens
+ * here in the main process — the UI cannot spoof a graded pass, because it never
+ * holds the checker.
+ *
+ * The one exception is React exercises, which must be graded in the renderer
+ * (that is the only place a React DOM exists), so they report their verdict back
+ * via the `forge:complete` IPC. Progress is therefore a local convenience record,
+ * not an anti-cheat boundary: a determined user can mark their own exercises
+ * complete. That is fine — the only person it would fool is themselves.
  */
 
 const runner = require('../runner');

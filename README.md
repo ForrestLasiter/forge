@@ -77,8 +77,10 @@ sudo apt update && sudo apt install -y nodejs npm python3
 
 ### Terminal
 
-Your command runs in a real `bash` inside a sandbox. The checker inspects the
-output *and the filesystem*.
+Your command runs in a real `bash`, in the lab workspace as its working
+directory. The checker inspects the output *and the filesystem*. It is a real
+shell with your real privileges, not a walled-off sandbox — see
+[the trust model](#trust-model).
 
 ![A terminal exercise, run and passed](docs/images/02-terminal.png)
 
@@ -141,6 +143,30 @@ one keystroke away.
 
 ---
 
+## Trust model
+
+Forge exists to run **your own code** — shell, Python, Node and React — with
+**your own privileges**. That is the point of the app, so be clear about what it
+is and is not:
+
+- The `~/.forge/workspace` lab is a convenient default directory, **not** a
+  security boundary. Code you run can `cd` out of it, read your home directory,
+  or reach the network, exactly as it could in your own terminal.
+- React exercises run in the app's own renderer. `new Function` isolates their
+  local scope but not browser globals, so React code can reach `window.forge`
+  too. There is no separate realm — and adding one would not stop anything the
+  learner can already do on the Kali track.
+- A synchronous infinite loop in a **React** exercise (`while (true) {}`) has no
+  timeout and will freeze the window until you restart. Python/Node/shell
+  runaways are killed as a process group at 10 seconds; React runs in-process
+  and cannot be.
+
+The one rule this implies: **don't paste code you don't trust into Forge**, the
+same rule as pasting it into a terminal. Full write-up in
+**[SECURITY.md](SECURITY.md)**.
+
+---
+
 ## Read the source — it is the fifth track
 
 Forge is a Node backend and a React frontend, which is exactly what tracks 3 and
@@ -168,9 +194,10 @@ access: it opens the window and is the only thing allowed to touch your
 filesystem or spawn programs. The **renderer** is a Chromium page running React
 with no OS access at all. They talk over IPC: the renderer calls
 `window.forge.submit(...)`, `preload.js` forwards it to a matching
-`ipcMain.handle` in `main.js`, and grading happens there. The UI can never mark
-itself complete — the same reason you never trust a client to validate its own
-input.
+`ipcMain.handle` in `main.js`, and grading for the shell/python/node tracks
+happens there — the UI never holds the checker, so it cannot fake a graded pass.
+(React exercises are the exception: they must be graded in the page, so they
+report their own verdict. Progress is a personal record, not an anti-cheat.)
 
 ---
 

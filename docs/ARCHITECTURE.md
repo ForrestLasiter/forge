@@ -39,10 +39,16 @@ code is in.
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-The renderer is sandboxed on purpose. `contextIsolation: true` and
-`nodeIntegration: false` are the modern Electron defaults, and they are the
-reason a bug in the UI cannot delete your home directory. Older tutorials turn
-both off because it is easier; that is how Electron got its security reputation.
+The renderer runs with `contextIsolation: true` and `nodeIntegration: false`,
+the modern Electron defaults. They are the reason the *page* cannot `require()`
+Node or spawn programs on its own — a stray bug in the UI's own rendering cannot
+reach the filesystem. Older tutorials turn both off because it is easier; that is
+how Electron got its security reputation.
+
+This protects against a bug in the UI, not against the learner. Forge's whole
+job is to run the learner's own code with the learner's privileges, so the
+`run`/`shell` bridge calls hand that code real execution deliberately. The trust
+model — what is and is not a boundary — is spelled out in **[SECURITY.md](../SECURITY.md)**.
 
 ### Why grading lives in the main process
 
@@ -54,10 +60,13 @@ There are two reasons, and both are worth internalising:
 
 1. **Mechanical.** Electron IPC serialises with the structured clone algorithm,
    which cannot clone a function. Sending a `check` would throw.
-2. **Security.** The UI can never mark itself complete, because it does not have
-   the logic that decides. It sends code up and gets a verdict back. This is the
-   same principle as never trusting a browser to validate its own form input —
-   a habit worth building on a toy app so it is automatic on a real one.
+2. **No spoofed grading.** For shell/python/node the UI never holds the checker;
+   it sends code up and gets a verdict back, so it cannot fake a graded pass —
+   the same principle as never trusting a browser to validate its own form input.
+   React is the exception: its DOM only exists in the renderer, so React grading
+   runs there and reports completion over `forge:complete`. That makes progress a
+   personal record, not an anti-cheat — a user can mark their own work done, and
+   the only person fooled is themselves.
 
 ---
 
@@ -86,21 +95,26 @@ process.kill(-child.pid, 'SIGKILL');   // the minus sign is the whole trick
 
 - **10 second timeout**, then SIGKILL. A `while True:` in an exercise is a normal
   student mistake, not a crash.
-- **100 KB output cap.** A runaway `print` in a loop would otherwise grow a
-  string until the process dies of memory exhaustion.
+- **100 KB output cap, per stream.** A runaway `print` in a loop would otherwise
+  grow a string until the process dies of memory exhaustion. Each incoming chunk
+  is sliced to the remaining room so a single large chunk cannot overshoot the
+  cap.
 - **Never rejects on non-zero exit.** A failing program is a normal outcome in a
   learning app, so the promise always resolves with
   `{ stdout, stderr, exitCode, timedOut, ms }` and the caller decides.
 
-### The sandbox workspace
+### The lab workspace
 
 Everything runs with `cwd` set to `~/.forge/workspace`. That directory is seeded
 with a small fake `lab/` — SSH auth logs, an access log, a target list — so
-exercises have concrete data, and so a lesson that says "delete every .tmp file"
-cannot reach anything you care about.
+exercises have concrete data, and so everyday `rm`/`chmod`/`find` practice lands
+on throwaway files instead of your real ones.
 
-`resetWorkspace()` wipes and re-seeds it. The **reset lab** button in the UI is
-the only destructive action in the app, and it is scoped to that one directory.
+It is a default working directory, **not** a jail: code that runs can `cd` out,
+read `$HOME`, or hit the network like any process you launch yourself (see
+[SECURITY.md](../SECURITY.md)). `resetWorkspace()` wipes and re-seeds it; the
+**reset lab** button in the UI is the only destructive action Forge itself takes,
+and it is scoped to that one directory.
 
 ### What the sandbox shell deliberately is not
 
@@ -153,10 +167,16 @@ graded against a live DOM instead. `src/components/ReactPreview.jsx`:
    only reason `index.html`'s Content-Security-Policy allows `'unsafe-eval'`.
 2. **Instantiate.** The compiled source becomes a function via `new Function`,
    with React and the hooks passed in as arguments — so a lesson can use
-   `useState` with no import line, and the code cannot reach anything it was not
-   handed.
+   `useState` with no import line. This is convenience, not a sandbox:
+   `new Function` isolates only local scope, so the code still runs in the
+   renderer's realm and can reach browser globals including `window.forge`. React
+   exercises are trusted the same way the other tracks are (see
+   [SECURITY.md](../SECURITY.md)).
 3. **Mount.** Into a real DOM node with its own React root, wrapped in an error
-   boundary so a crash shows a message rather than blanking the app.
+   boundary so a render-time *exception* shows a message rather than blanking the
+   app. A synchronous infinite loop is a different beast — it runs on the
+   renderer's one thread with no timeout and freezes the window until restart,
+   because unlike the process tracks there is no separate process to kill.
 4. **Assert.** `shared/assertions.mjs` runs declarative checks against that DOM —
    clicking real buttons, typing into real inputs.
 

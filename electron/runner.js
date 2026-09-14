@@ -5,10 +5,13 @@
  * Electron has two kinds of process:
  *   - the "main" process: plain Node.js. It can touch the filesystem, spawn
  *     programs, open windows. There is exactly one.
- *   - the "renderer" process: a Chromium tab running your React UI. For safety
- *     it is sandboxed and cannot spawn `python3` or read your disk.
- * Running untrusted-ish code is a Node job, so it belongs here. The renderer
- * asks for it over IPC (see preload.js).
+ *   - the "renderer" process: a Chromium tab running your React UI. It runs with
+ *     `contextIsolation` on and `nodeIntegration` off, so the page itself cannot
+ *     `require()` Node or spawn `python3` directly.
+ * Spawning interpreters is a Node job, so it belongs here; the renderer asks for
+ * it over IPC (see preload.js). Note this is not a sandbox against the LEARNER:
+ * the code Forge runs is the learner's own, executed with the learner's own
+ * privileges, on purpose. See SECURITY.md for the trust model.
  *
  * WHY spawn() AND NOT exec()
  * exec() hands your string to a shell and buffers everything into memory. spawn()
@@ -26,8 +29,16 @@ const DEFAULT_TIMEOUT = 10_000; // ms
 
 /**
  * The workspace is a real directory on disk that lesson exercises read and
- * write. Keeping it separate from your home directory means a lesson that says
- * "delete every .tmp file" can never touch anything you care about.
+ * write. It is the DEFAULT working directory for everything Forge runs, so a
+ * lesson's `open("lab/logs/auth.log")` resolves to the seeded lab files.
+ *
+ * It is NOT a security boundary. Forge runs your Python, Node and shell with
+ * your own OS privileges — teaching the real command line requires nothing less
+ * — so code you run can `cd` out, read your home directory, or reach the
+ * network exactly as your own terminal can. The workspace just gives lessons a
+ * predictable place to work and keeps the everyday `rm`/`chmod` practice off
+ * your real files. Trust model: see SECURITY.md. Don't paste code you don't
+ * trust into Forge, the same rule as pasting it into a terminal.
  */
 function workspaceDir() {
   return path.join(os.homedir(), '.forge', 'workspace');
@@ -204,13 +215,21 @@ function execute(command, args, { cwd, stdin = '', timeout = DEFAULT_TIMEOUT, en
     let timedOut = false;
     let finished = false;
 
+    // Cap each stream at exactly MAX_OUTPUT. A single stream chunk can be tens of
+    // KB, so a naive "if we're under the limit, append the whole chunk" lets one
+    // chunk sail past the cap — the accumulated buffer could end up MAX_OUTPUT
+    // plus almost a full chunk. Slice each chunk to the remaining room instead.
     const append = (which, chunk) => {
       const text = chunk.toString();
       if (which === 'out') {
-        if (stdout.length < MAX_OUTPUT) stdout += text;
-        else truncated = true;
-      } else if (stderr.length < MAX_OUTPUT) stderr += text;
-      else truncated = true;
+        const room = MAX_OUTPUT - stdout.length;
+        if (room > 0) stdout += text.slice(0, room);
+        if (text.length > room) truncated = true;
+      } else {
+        const room = MAX_OUTPUT - stderr.length;
+        if (room > 0) stderr += text.slice(0, room);
+        if (text.length > room) truncated = true;
+      }
     };
 
     child.stdout.on('data', (c) => append('out', c));
