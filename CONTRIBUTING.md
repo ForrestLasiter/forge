@@ -88,12 +88,14 @@ House style for lesson prose:
 ```js
 {
   id: 'count-failed',
-  kind: 'shell',                   // 'shell' | 'python' | 'node' | 'react' | 'quiz'
+  kind: 'shell',                   // 'shell' | 'powershell' | 'python' | 'node' | 'react' | 'quiz'
   prompt: 'markdown',
   starter: '',                     // pre-filled in the editor
   solution: 'grep -c "Failed password" lab/logs/auth.log',
   hints: ['...', '...'],           // revealed one at a time, increasingly specific
   requires: ['ip'],                // optional: skip in CI if this binary is absent
+  platform: 'linux',              // optional: 'linux' | 'win32' — skip off that OS
+                                   //   (also settable on a lesson or a whole track)
   check: ({ code, result, h }) => ({ pass: true, message: '...' }),
 }
 ```

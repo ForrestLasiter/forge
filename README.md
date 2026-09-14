@@ -2,15 +2,15 @@
 
 # Forge
 
-**A desktop app that teaches the Kali Linux command line, Python, JavaScript, Node and React — by making you write code that it actually runs and checks.**
+**A desktop app for Windows and Linux that teaches the Kali/Linux command line, PowerShell, Python, JavaScript, Node and React — by making you write code that it actually runs and checks.**
 
 [![CI](https://github.com/forrestlasiter/forge/actions/workflows/ci.yml/badge.svg)](https://github.com/forrestlasiter/forge/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-5eead4.svg)](LICENSE)
 [![Electron](https://img.shields.io/badge/Electron-32-47848f.svg)](https://electronjs.org)
-[![Lessons](https://img.shields.io/badge/lessons-29-fbbf24.svg)](docs/CURRICULUM.md)
-[![Exercises](https://img.shields.io/badge/graded%20exercises-90-a78bfa.svg)](docs/CURRICULUM.md)
+[![Lessons](https://img.shields.io/badge/lessons-35-fbbf24.svg)](docs/CURRICULUM.md)
+[![Exercises](https://img.shields.io/badge/graded%20exercises-108-a78bfa.svg)](docs/CURRICULUM.md)
 
-4 tracks · 29 lessons · 90 graded exercises · no internet needed after install
+5 tracks · 35 lessons · 108 graded exercises · Windows & Linux · no internet needed after install
 
 </div>
 
@@ -28,48 +28,73 @@ terminal output looked fine.
 | Track | Lessons | Covers |
 |---|---|---|
 | **Kali & the Linux command line** | 8 | the shell, filesystem, grep/find/pipes, permissions and SUID, processes and systemd, network triage, apt on a rolling distro, bash scripting |
+| **PowerShell** | 6 | cmdlets and Verb-Noun discovery, the object pipeline, Where-Object/Select-String filtering, files and regex capture, logic and loops, a log-triage tool |
 | **Python from zero** | 8 | values, control flow, collections, functions, files and exceptions, modules and venvs, classes, and a log-triage tool you build |
 | **JavaScript & Node** | 7 | the language, map/filter/reduce, async and the event loop, the Node runtime, npm and lockfiles, an HTTP API, the same triage tool rebuilt |
 | **React** | 6 | JSX, props and keys, `useState`, `useEffect`, controlled forms, a findings dashboard |
 
 **[Full curriculum with every exercise →](docs/CURRICULUM.md)**
 
-All four tracks share one dataset — a small fake SSH auth log in your sandbox.
-You solve the same problem with a shell pipeline, then in Python, then in Node.
-Seeing one problem in three languages is the fastest way to tell what is
-*language* and what is *programming*.
+The two shell tracks are cross-platform mirror images. **Forge runs on Windows
+and Linux**, and so do both shells: PowerShell 7 (`pwsh`) runs on Linux, and
+`bash` runs on Windows once Git for Windows is installed — so you can learn either
+shell on either OS. Forge opens on the one native to your machine and shows the
+rest.
 
-The order is deliberate: Linux first (everything else runs on it), then Python
-(the language most of your tooling is written in), then JavaScript (which React
-needs), then React.
+The shell, PowerShell, Python and Node tracks all share one dataset — a small
+fake SSH auth log in your workspace. You solve the same problem four ways, which
+is the fastest way to tell what is *language* and what is *programming*.
+
+The order is deliberate: the Linux shell first (everything else runs on it),
+PowerShell alongside it, then Python (the language most of your tooling is written
+in), then JavaScript (which React needs), then React.
 
 ---
 
 ## Install
 
-Built for Kali, works on any Debian-based Linux.
+### Windows
+
+Download the latest **Forge Setup `.exe`** from the
+[Releases page](https://github.com/ForrestLasiter/forge/releases) and run it — a
+normal Windows installer, no command line required.
+
+- Python, Node and PowerShell 5.1 come with (or install easily on) Windows.
+- For the **PowerShell 7** track features and the **bash/Kali** track, install
+  [PowerShell 7](https://aka.ms/powershell) and
+  [Git for Windows](https://git-scm.com/download/win) (which provides `bash`).
+  Anything missing is skipped with a note; the rest of the app still works.
+
+### Linux (Kali or any Debian-based distro)
+
+Download the **`.AppImage`** or **`.deb`** from
+[Releases](https://github.com/ForrestLasiter/forge/releases), or build from source:
 
 ```bash
-git clone https://github.com/forrestlasiter/forge.git
+git clone https://github.com/ForrestLasiter/forge.git
 cd forge
 ./install.sh
 ```
 
 That checks your toolchain, installs dependencies, builds the interface, and adds
 **Forge** to your application menu. The first run downloads Electron (~180MB),
-once.
+once. Launch from the menu, or `./forge`.
 
-Launch from the menu, or:
-
-```bash
-./forge
-```
-
-**Requires** Node 18+ and `python3`. On Kali:
+**Requires** Node 18+ and `python3`; add `pwsh` for the PowerShell track:
 
 ```bash
 sudo apt update && sudo apt install -y nodejs npm python3
+# PowerShell 7 (optional): see https://learn.microsoft.com/powershell/scripting/install/install-debian
 ```
+
+### Build the installers yourself
+
+```bash
+npm run dist:win      # Windows: release/Forge Setup <version>.exe
+npm run dist:linux    # Linux:   release/Forge-<version>.AppImage and .deb
+```
+
+CI also builds them on every version tag — see `.github/workflows/release.yml`.
 
 ---
 
@@ -83,6 +108,13 @@ shell with your real privileges, not a walled-off sandbox — see
 [the trust model](#trust-model).
 
 ![A terminal exercise, run and passed](docs/images/02-terminal.png)
+
+### PowerShell
+
+Your code runs through `pwsh` (PowerShell 7) when it is installed, and falls back
+to the built-in Windows PowerShell 5.1 otherwise. Lessons are written to the
+subset common to both, so they behave the same on Windows and Linux. The checker
+grades the output — and the workspace, when a lesson writes a file.
 
 ### Python and Node
 

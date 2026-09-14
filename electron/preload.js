@@ -41,5 +41,6 @@ contextBridge.exposeInMainWorld('forge', {
   },
 
   toolchain: () => ipcRenderer.invoke('forge:toolchain'),
+  platform: () => ipcRenderer.invoke('forge:platform'),
   openExternal: (url) => ipcRenderer.invoke('forge:open-external', url),
 });

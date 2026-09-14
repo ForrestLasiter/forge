@@ -665,7 +665,11 @@ just want the result of a short command. This is exactly what Forge's own
       check: ({ code, result, h }) => {
         if (!/path\.join/.test(code)) return { pass: false, message: 'Use path.join rather than building the string by hand.' };
         const lines = h.lines(result.stdout);
-        return JSON.stringify(lines) === JSON.stringify(['lab/logs/auth.log', '.log'])
+        // path.join uses the OS separator — "lab\\logs\\auth.log" on Windows,
+        // "lab/logs/auth.log" on Linux. Both are correct (that is the whole
+        // point of the exercise), so normalise before comparing.
+        const normalised = (lines[0] || '').replace(/\\/g, '/');
+        return normalised === 'lab/logs/auth.log' && lines[1] === '.log'
           ? { pass: true, message: 'path.join is how you avoid the separator bugs that bite cross-platform code.' }
           : { pass: false, message: `Expected "lab/logs/auth.log" then ".log". Got: ${lines.join(' | ')}` };
       },

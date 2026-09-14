@@ -117,6 +117,7 @@ function registerIpc() {
   ipcMain.handle('forge:run', async (_evt, { kind, code }) => {
     if (kind === 'python') return runner.runPython(code);
     if (kind === 'node') return runner.runNode(code);
+    if (kind === 'powershell') return runner.runPowerShell(code);
     return runner.runShell(code);
   });
 
@@ -131,6 +132,7 @@ function registerIpc() {
   ipcMain.handle('forge:workspace:reset', () => runner.resetWorkspace());
   ipcMain.handle('forge:workspace:open', () => shell.openPath(runner.workspaceDir()));
   ipcMain.handle('forge:toolchain', () => runner.probeToolchain());
+  ipcMain.handle('forge:platform', () => process.platform);
   ipcMain.handle('forge:open-external', (_evt, url) => shell.openExternal(url));
 }
 

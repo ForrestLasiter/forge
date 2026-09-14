@@ -6,7 +6,7 @@
  *   track   = { id, title, blurb, colour, lessons: [lesson] }
  *   lesson  = { id, title, minutes, body (markdown), exercises: [exercise] }
  *   exercise= {
- *       id, kind: 'shell'|'python'|'node'|'react'|'quiz',
+ *       id, kind: 'shell'|'powershell'|'python'|'node'|'react'|'quiz',
  *       prompt (markdown), starter, solution, hints: [string],
  *       check: ({ code, result, h }) => boolean | { pass, message }
  *   }
@@ -39,6 +39,7 @@ const tracks = [
   require('./python'),
   require('./node'),
   require('./react'),
+  require('./powershell'),
 ];
 
 /** Helpers handed to every `check` function. Keeps lesson code short and readable. */
@@ -84,6 +85,7 @@ async function runExercise(kind, code) {
     case 'python': return runner.runPython(code);
     case 'node': return runner.runNode(code);
     case 'shell': return runner.runShell(code);
+    case 'powershell': return runner.runPowerShell(code);
     default: return { stdout: '', stderr: '', exitCode: 0, timedOut: false, ms: 0 };
   }
 }

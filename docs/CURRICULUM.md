@@ -2,19 +2,21 @@
 
 <!-- GENERATED FILE — edit the lesson files, then run `npm run docs`. -->
 
-**4 tracks · 29 lessons · 90 graded exercises · ~8 hours of reading** (plus however long the exercises take you, which is the part that matters).
+**5 tracks · 35 lessons · 108 graded exercises · ~10 hours of reading** (plus however long the exercises take you, which is the part that matters).
 
-Exercise kinds: 31 quiz · 17 terminal · 17 python · 13 node · 12 react
+Exercise kinds: 37 quiz · 17 terminal · 17 python · 13 node · 12 react · 12 powershell
 
-The tracks are ordered deliberately. Linux first, because everything else runs
-on it. Python next, because most of the tooling around you is written in it.
-Then JavaScript, because React needs it. Then React. You can jump around, but
-later tracks assume the earlier ones.
+The tracks are ordered deliberately. The Linux shell first, because everything
+else runs on it, with PowerShell alongside it as the cross-platform counterpart.
+Python next, because most of the tooling around you is written in it. Then
+JavaScript, because React needs it. Then React. You can jump around, but later
+tracks assume the earlier ones.
 
-All four tracks share one dataset — a small fake SSH auth log in your sandbox.
-You solve the same log-triage problem as a shell pipeline, then in Python, then
-in Node. Seeing one problem in three languages is the fastest way to tell what
-is *language* and what is *programming*.
+The shell, PowerShell, Python and Node tracks share one dataset — a small fake
+SSH auth log in your workspace. You solve the same log-triage problem four ways.
+Seeing one problem in four languages is the fastest way to tell what is
+*language* and what is *programming*. Forge runs on Windows and Linux, and so do
+both shells — PowerShell 7 on Linux, bash on Windows via Git for Windows.
 
 ---
 
@@ -279,6 +281,63 @@ is *language* and what is *programming*.
 **Project: a findings dashboard**
 
 - `dashboard` *(react)* — Build the dashboard described above. Seed with `{id:1, host:"10.0.0.1", severity:"high", resolved:false}` and `{id:2, host:"192.168.1.7", severity:"low", res…
+
+</details>
+
+---
+
+## PowerShell
+
+*Cmdlets, the object pipeline, filtering, files and a real log-triage tool — on Windows or Linux.*
+
+6 lessons · 18 exercises · ~95 minutes of reading
+
+| # | Lesson | Exercises | Covers |
+|---|---|---|---|
+| 01 | **Cmdlets, output and variables** | 2 powershell, 1 quiz | PowerShell is the shell that ships with every Windows box, and PowerShell 7 |
+| 02 | **Everything is an object** | 2 powershell, 1 quiz | In bash, a command prints text and the next command re-parses that text. |
+| 03 | **Filtering: Where-Object and Select-String** | 2 powershell, 1 quiz | matching lines (as MatchInfo objects). |
+| 04 | **Files, text and a little regex** | 2 powershell, 1 quiz | Set-Content replaces; Add-Content appends. |
+| 05 | **Variables, logic and loops** | 2 powershell, 1 quiz | Remember the word-operators from the filtering lesson: -eq, not ==. |
+| 06 | **A real triage tool** | 2 powershell, 1 quiz | You now have every piece to turn a raw log into an answer a human can act on. |
+
+<details><summary>Every exercise in this track</summary>
+
+**Cmdlets, output and variables**
+
+- `hello` *(powershell)* — Print exactly: `forge online`
+- `interp` *(powershell)* — Make two variables — `$target` set to `"10.10.10.5"` and `$port` set to the number `22` — then print `Scanning 10.10.10.5 on port 22` using string interpolat…
+- `discover` *(quiz)* — You want to find the cmdlet that lists running processes but cannot remember its name. What gets you there fastest?
+
+**Everything is an object**
+
+- `count-files` *(powershell)* — Print the number of files (not folders) anywhere under the `lab` directory. Use the pipeline — do not count them by hand.
+- `largest` *(powershell)* — Print the **name** of the single largest file under `lab` (by size), and nothing else.
+- `why-objects` *(quiz)* — Why does `Get-ChildItem \| Sort-Object Length` keep working even if a future PowerShell changes how a directory listing is displayed?
+
+**Filtering: Where-Object and Select-String**
+
+- `failed-count` *(powershell)* — Print how many lines in `lab/logs/auth.log` contain `Failed password`. (You counted these in bash with `grep -c` — this is the PowerShell version.)
+- `filter-ip` *(powershell)* — The file `lab/configs/targets.txt` has one IP per line. Print only the one whose last octet is `99`.
+- `dollar-underscore` *(quiz)* — Inside `Where-Object { $_ -gt 100 }`, what is `$_`?
+
+**Files, text and a little regex**
+
+- `write-file` *(powershell)* — Create the file `lab/loot/found.txt` containing exactly the single line `pwned`. (This exercise is graded on the file you create, not on printed output.)
+- `unique-attackers` *(powershell)* — From `lab/logs/auth.log`, print how many **distinct** source IPs appear in `Failed password` lines. Capture the IP with a regex group, de-duplicate, then count.
+- `set-vs-add` *(quiz)* — You want to keep appending new lines to a running report file across many runs. Which cmdlet?
+
+**Variables, logic and loops**
+
+- `sum-ports` *(powershell)* — Make an array of the numbers `22`, `80` and `443`, then print their **sum** using the pipeline.
+- `service-lookup` *(powershell)* — The file `lab/configs/services.conf` has `name=port` lines. Print just the port number for `https` (the digits only, no `https=`).
+- `no-ampersand` *(quiz)* — On the built-in Windows PowerShell 5.1, `Get-Process && Get-Service` does what?
+
+**A real triage tool**
+
+- `summary-line` *(powershell)* — From `lab/logs/auth.log`, print one line in exactly this shape: `<N> failed logins from <M> hosts`, where N is the number of `Failed password` lines and M is…
+- `noisiest` *(powershell)* — Print just the single source IP responsible for the **most** `Failed password` attempts in `lab/logs/auth.log`.
+- `when-powershell` *(quiz)* — You have a stream of records where you keep needing the same three fields by name. When is PowerShell the better reach than a bash pipeline?
 
 </details>
 

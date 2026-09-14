@@ -24,10 +24,11 @@ export default function App() {
   // One effect for one job: load everything the app needs, once.
   useEffect(() => {
     (async () => {
-      const [curriculum, prog, tools] = await Promise.all([
+      const [curriculum, prog, tools, platform] = await Promise.all([
         window.forge.curriculum(),
         window.forge.progress.get(),
         window.forge.toolchain(),
+        window.forge.platform(),
       ]);
       setTracks(curriculum);
       setProgress(prog);
@@ -39,7 +40,13 @@ export default function App() {
         setTrackId(last.trackId);
         setLessonId(last.lessonId);
       } else {
-        setLessonId(curriculum[0].lessons[0].id);
+        // First launch: open the shell track native to this OS — PowerShell on
+        // Windows, the Kali/bash track on Linux — so the first thing you see is
+        // something that actually runs here.
+        const preferred = platform === 'win32' ? 'powershell' : 'linux';
+        const start = curriculum.find((t) => t.id === preferred) || curriculum[0];
+        setTrackId(start.id);
+        setLessonId(start.lessons[0].id);
       }
     })();
   }, []);
@@ -165,9 +172,11 @@ export default function App() {
           <div className="main-inner">
             {missing.length > 0 && (
               <div className="banner">
-                Not found on this machine: <strong>{missing.join(', ')}</strong>. Exercises in those
-                languages will fail until you install them — on Kali,
-                <code> sudo apt install python3 nodejs</code>.
+                Not found on this machine: <strong>{missing.join(', ')}</strong>. Exercises that
+                need them are skipped until you install them — the other tracks still work. See
+                the README's install notes for your OS ({' '}
+                <code>bash</code> ships with Git for Windows; <code>powershell</code> means
+                PowerShell 7, <code>pwsh</code>).
               </div>
             )}
 
