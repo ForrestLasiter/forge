@@ -18,7 +18,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['20', '22']
+        # jsdom 30 (the React test harness) pulls undici 8, which fails to
+        # initialise on the entire Node 20 line ("webidl.util.markAsUncloneable
+        # is not a function"). jsdom is dev-only — the app runs under Electron's
+        # own Node — so the grader is tested on Node 22+ and Node 20 is dropped.
+        node: ['22', '24']
 
     steps:
       - uses: actions/checkout@v4
@@ -26,10 +30,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-          # jsdom 30 (the React test harness) pulls undici 8, which calls
-          # worker_threads.markAsUncloneable — added in Node 20.17 / 22.8. The
-          # runner's cached Node 20 can be older, so fetch the latest patch of
-          # the requested line rather than trusting the tool cache.
           check-latest: true
           cache: npm
 
