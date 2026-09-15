@@ -14,16 +14,20 @@
 
 import React, { useMemo } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
+import { EditorView } from '@codemirror/view';
 import { python } from '@codemirror/lang-python';
 import { javascript } from '@codemirror/lang-javascript';
 
-export default function Editor({ value, onChange, kind, minHeight = '120px' }) {
+export default function Editor({ value, onChange, kind, minHeight = '120px', label = 'Code editor' }) {
   const extensions = useMemo(() => {
-    if (kind === 'python') return [python()];
-    if (kind === 'node') return [javascript()];
-    if (kind === 'react') return [javascript({ jsx: true })];
-    return []; // shell: no grammar bundled, plain text is fine and honest
-  }, [kind]);
+    // Give the editor's contenteditable an accessible name so screen readers
+    // announce it as a labelled text area, not an anonymous region (WCAG 4.1.2).
+    const named = EditorView.contentAttributes.of({ 'aria-label': label });
+    if (kind === 'python') return [python(), named];
+    if (kind === 'node') return [javascript(), named];
+    if (kind === 'react') return [javascript({ jsx: true }), named];
+    return [named]; // shell: no grammar bundled, plain text is fine and honest
+  }, [kind, label]);
 
   return (
     <div className="editor-wrap">

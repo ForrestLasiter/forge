@@ -51,22 +51,29 @@ export default function Scratch({ open, onToggle }) {
 
   return (
     <div className="scratch">
-      <div className="scratch-head" onClick={onToggle}>
+      <button
+        type="button"
+        className="scratch-head"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls="scratch-body"
+      >
         <strong>Sandbox shell</strong>
         <span style={{ opacity: 0.65 }}>~/.forge/workspace</span>
         <span className="spacer" />
-        <span>{open ? '▾ hide' : '▴ show'}</span>
-      </div>
+        <span><span aria-hidden="true">{open ? '▾' : '▴'}</span> {open ? 'hide' : 'show'}</span>
+      </button>
       {open && (
-        <div className="scratch-body">
+        <div className="scratch-body" id="scratch-body">
           {log && <pre>{log}</pre>}
           <form className="scratch-row" onSubmit={submit} style={{ marginTop: log ? 9 : 0 }}>
-            <span className="prompt-sigil">$</span>
+            <span className="prompt-sigil" aria-hidden="true">$</span>
             <input
               value={cmd}
               onChange={(e) => setCmd(e.target.value)}
               onKeyDown={onKeyDown}
               placeholder={busy ? 'running…' : 'try: ls -la lab'}
+              aria-label="Sandbox shell command"
               disabled={busy}
               spellCheck={false}
             />

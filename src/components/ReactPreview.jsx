@@ -176,7 +176,7 @@ export default function ReactPreview({ code, componentName = 'App', assertions, 
         <span>Live preview</span>
         <span style={{ marginLeft: 'auto', opacity: 0.7 }}>{status}</span>
       </div>
-      {error && <div className="preview-error">{error}</div>}
+      {error && <div className="preview-error" role="alert">{error}</div>}
       <div className="preview-surface" ref={hostRef} />
     </div>
   );
