@@ -92,6 +92,12 @@ async function checkReactExercise(exercise, React, ReactDOMClient, ReactDOM, Bab
 (async () => {
   runner.resetWorkspace(); // start from clean lab files every run
 
+  // Probe once. An exercise whose interpreter is not on this machine is SKIPPED,
+  // not failed — pwsh may be absent on a Linux dev box, bash on a bare Windows
+  // one. Maps each exercise kind to the toolchain entry it needs.
+  const tools = await runner.probeToolchain();
+  const NEEDS = { shell: 'bash', powershell: 'powershell', python: 'python', node: 'node' };
+
   const { runAssertions } = await import('../shared/assertions.mjs');
   await setupDom();
   const React = require('react');
@@ -110,6 +116,20 @@ async function checkReactExercise(exercise, React, ReactDOMClient, ReactDOM, Bab
 
       for (const exercise of lesson.exercises) {
         const id = `${track.id}/${lesson.id}/${exercise.id}`;
+
+        // Tracks/lessons/exercises tagged for another OS are skipped here (the
+        // app still shows them). The bash track is platform:'linux', so it does
+        // not fail on a Windows runner where its Unix tools differ.
+        const plat = exercise.platform || lesson.platform || track.platform;
+        if (plat && plat !== process.platform) {
+          skip += 1; line.push(`${YELLOW}s${RESET}`); continue;
+        }
+
+        // Skip if the interpreter this kind needs is not installed on this box.
+        const need = NEEDS[exercise.kind];
+        if (need && tools[need] && !tools[need].available) {
+          skip += 1; line.push(`${YELLOW}s${RESET}`); continue;
+        }
 
         // Environment-dependent exercises are skipped, not failed.
         if (exercise.requires && exercise.requires.some((b) => !have(b))) {

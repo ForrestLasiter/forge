@@ -11,6 +11,11 @@
 
 module.exports = {
   id: 'linux',
+  // This track is bash-native. It runs on Linux, and on Windows only when Git
+  // Bash (or WSL) supplies `bash`; the app still SHOWS it everywhere so a Windows
+  // user can read and learn it. `platform` lets the verifier skip it off-Linux
+  // rather than fail Unix-only tools. Removing this makes it run everywhere.
+  platform: 'linux',
   title: 'Kali & the Linux command line',
   blurb: 'The shell, the filesystem, permissions, processes, networking and your first bash scripts.',
   colour: '#5eead4',

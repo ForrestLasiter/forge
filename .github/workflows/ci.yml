@@ -18,7 +18,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['20', '22']
+        # jsdom 30 (the React test harness) pulls undici 8, which fails to
+        # initialise on the entire Node 20 line ("webidl.util.markAsUncloneable
+        # is not a function"). jsdom is dev-only — the app runs under Electron's
+        # own Node — so the grader is tested on Node 22+ and Node 20 is dropped.
+        node: ['22', '24']
 
     steps:
       - uses: actions/checkout@v4
@@ -26,12 +30,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
+          check-latest: true
           cache: npm
 
       # The Linux track's exercises run real shell commands, so the runner needs
       # the same tools a Kali box has. iproute2 supplies `ip`; without it the
       # networking exercise is skipped rather than failed, but we would rather
-      # actually test it.
+      # actually test it. PowerShell 7 (pwsh) is preinstalled on GitHub's Ubuntu
+      # runners, so the cross-platform PowerShell track is graded here too.
       - name: Install shell tooling
         run: sudo apt-get update && sudo apt-get install -y iproute2
 
@@ -46,6 +52,32 @@ jobs:
           npm run docs
           git diff --exit-code docs/CURRICULUM.md \
             || (echo "::error::docs/CURRICULUM.md is stale — run 'npm run docs' and commit the result." && exit 1)
+
+  # Prove the runner and grader work on Windows: the PowerShell track runs (via
+  # pwsh, or Windows PowerShell 5.1), Python resolves through `py`/`python`, and
+  # the process-tree kill uses taskkill. The bash/Kali track is platform:'linux'
+  # so it is skipped here rather than failed on tools Windows lacks.
+  verify-windows:
+    name: Verify curriculum (windows)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify every reference solution
+        run: npm test
 
   smoke:
     name: Launch the real app

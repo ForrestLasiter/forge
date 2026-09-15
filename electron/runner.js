@@ -27,6 +27,11 @@ const path = require('path');
 const MAX_OUTPUT = 100 * 1024; // 100 KB. A runaway print loop won't eat your RAM.
 const DEFAULT_TIMEOUT = 10_000; // ms
 
+// Forge runs on Linux and Windows. Almost everything is shared; the handful of
+// places that must differ (how you kill a process tree, what the interpreters
+// are called, which directories hold them) all branch on this one flag.
+const IS_WIN = process.platform === 'win32';
+
 /**
  * The workspace is a real directory on disk that lesson exercises read and
  * write. It is the DEFAULT working directory for everything Forge runs, so a
@@ -153,17 +158,40 @@ function candidateBinDirs() {
     }
   }
 
-  dirs.push(
-    path.join(home, '.volta', 'bin'),
-    path.join(home, '.bun', 'bin'),
-    path.join(home, '.local', 'bin'),
-    '/usr/local/bin',
-    '/usr/bin',
-    '/bin',
-    '/usr/sbin',
-    '/sbin',
-    '/snap/bin'
-  );
+  if (IS_WIN) {
+    // Windows equivalents. The Store's `python3` alias is a stub that opens the
+    // Store instead of running Python, so the real installs under
+    // %LOCALAPPDATA%\Programs\Python must come first on PATH. Git for Windows
+    // supplies the `bash` the Linux track needs, when it is installed at all.
+    const pf = process.env.ProgramFiles || 'C:\\Program Files';
+    const local = process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
+    try {
+      const pyRoot = path.join(local, 'Programs', 'Python');
+      for (const entry of fs.readdirSync(pyRoot)) {
+        dirs.push(path.join(pyRoot, entry), path.join(pyRoot, entry, 'Scripts'));
+      }
+    } catch { /* no user Python install — normal */ }
+    dirs.push(
+      path.join(pf, 'nodejs'),
+      path.join(pf, 'PowerShell', '7'),
+      path.join(local, 'Programs', 'Python', 'Launcher'),
+      path.join(pf, 'Git', 'bin'),
+      path.join(pf, 'Git', 'usr', 'bin'),
+      'C:\\Windows\\System32\\WindowsPowerShell\\v1.0'
+    );
+  } else {
+    dirs.push(
+      path.join(home, '.volta', 'bin'),
+      path.join(home, '.bun', 'bin'),
+      path.join(home, '.local', 'bin'),
+      '/usr/local/bin',
+      '/usr/bin',
+      '/bin',
+      '/usr/sbin',
+      '/sbin',
+      '/snap/bin'
+    );
+  }
   return dirs.filter((d) => fs.existsSync(d));
 }
 
@@ -194,9 +222,13 @@ function execute(command, args, { cwd, stdin = '', timeout = DEFAULT_TIMEOUT, en
     try {
       child = spawn(command, args, {
         cwd: cwd || ensureWorkspace(),
-        // detached puts the child in its own process group, so killing
-        // -pid kills the child AND anything it spawned.
-        detached: true,
+        // On POSIX, detached puts the child in its own process group, so
+        // killing -pid takes the child AND anything it spawned. Windows has no
+        // process groups to signal this way — we kill the tree with taskkill
+        // instead (see the timer below) — and detaching there would only risk a
+        // stray console window, so it stays off.
+        detached: !IS_WIN,
+        windowsHide: true,
         env: { ...process.env, PATH: composedPath(), ...(env || {}) },
       });
     } catch (err) {
@@ -237,10 +269,22 @@ function execute(command, args, { cwd, stdin = '', timeout = DEFAULT_TIMEOUT, en
 
     const timer = setTimeout(() => {
       timedOut = true;
-      try {
-        process.kill(-child.pid, 'SIGKILL');
-      } catch {
-        try { child.kill('SIGKILL'); } catch { /* already gone */ }
+      if (IS_WIN) {
+        // Negative-PID group signalling does not exist on Windows. taskkill /T
+        // walks the child's whole tree, /F forces it — the equivalent of killing
+        // the POSIX process group, so a runaway that spawned children still dies
+        // as a unit.
+        try {
+          spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true });
+        } catch {
+          try { child.kill(); } catch { /* already gone */ }
+        }
+      } else {
+        try {
+          process.kill(-child.pid, 'SIGKILL');
+        } catch {
+          try { child.kill('SIGKILL'); } catch { /* already gone */ }
+        }
       }
     }, timeout);
 
@@ -268,48 +312,150 @@ function execute(command, args, { cwd, stdin = '', timeout = DEFAULT_TIMEOUT, en
   });
 }
 
-/** Write code to a temp file and run it with the given interpreter. */
-async function runInterpreted(interpreter, extension, code, opts = {}) {
+/**
+ * Interpreter names differ across platforms, so resolve each one to whatever
+ * actually runs on THIS machine and cache the answer:
+ *   - Python is `python3` on Linux, but on Windows the `python3` name is a
+ *     Microsoft Store stub that opens the Store rather than running Python — so
+ *     there we try the `py -3` launcher and the real `python` first.
+ *   - PowerShell 7 (`pwsh`) is the cross-platform target and works on both OSes;
+ *     where it is absent on Windows we fall back to the built-in Windows
+ *     PowerShell 5.1 (`powershell`). On Linux there is no 5.1 to fall back to.
+ * `undefined` means "not resolved yet"; `null` means "resolved, nothing works".
+ */
+const resolved = {};
+
+async function resolveCmd(key, candidates, probeArgs) {
+  if (resolved[key] !== undefined) return resolved[key];
+  for (const cand of candidates) {
+    const [cmd, ...pre] = cand.split(' ');
+    const r = await execute(cmd, [...pre, ...probeArgs], { timeout: 8000 });
+    if (r.exitCode === 0) { resolved[key] = cand; return cand; }
+  }
+  resolved[key] = null;
+  return null;
+}
+
+const pythonCmd = () =>
+  resolveCmd('python', IS_WIN ? ['py -3', 'python', 'python3'] : ['python3', 'python'], ['--version']);
+const powershellCmd = () =>
+  resolveCmd('pwsh', IS_WIN ? ['pwsh', 'powershell'] : ['pwsh'], ['-NoProfile', '-Command', 'exit 0']);
+
+function notFound(label, hint) {
+  return {
+    stdout: '',
+    stderr: `Forge could not find ${label} on this machine.${hint ? ' ' + hint : ''}`,
+    exitCode: 127,
+    timedOut: false,
+    ms: 0,
+  };
+}
+
+/** Write code to a temp file and run it with the given interpreter + pre-args. */
+async function runInterpreted(command, preArgs, extension, code, opts = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-'));
   const file = path.join(dir, `main${extension}`);
   fs.writeFileSync(file, code, 'utf8');
   try {
     // cwd is the workspace, NOT the temp dir, so `open('lab/logs/auth.log')`
     // inside a lesson resolves to the lab files.
-    return await execute(interpreter, [file], { cwd: ensureWorkspace(), ...opts });
+    return await execute(command, [...preArgs, file], { cwd: ensureWorkspace(), ...opts });
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 }
 
-const runPython = (code, opts) => runInterpreted('python3', '.py', code, opts);
-const runNode = (code, opts) => runInterpreted('node', '.js', code, opts);
+async function runPython(code, opts) {
+  const cmd = await pythonCmd();
+  if (!cmd) return notFound('Python 3', 'Install it and reopen Forge.');
+  const [bin, ...pre] = cmd.split(' ');
+  return runInterpreted(bin, pre, '.py', code, opts);
+}
+
+const runNode = (code, opts) => runInterpreted('node', [], '.js', code, opts);
 
 /**
- * Run a shell command the way your terminal would.
+ * Run PowerShell from a temp .ps1 file. `-NoProfile` keeps a user's profile from
+ * changing behaviour between machines; `-NonInteractive` stops a lesson that asks
+ * for input from hanging forever. On Windows `-ExecutionPolicy Bypass` is needed
+ * because the default policy blocks running script files at all — on Linux there
+ * is no execution policy, so the flag is Windows-only.
+ */
+async function runPowerShell(code, opts) {
+  const cmd = await powershellCmd();
+  if (!cmd) {
+    return notFound(
+      'PowerShell',
+      IS_WIN ? '' : 'Install PowerShell 7 (pwsh) to take this track on Linux.'
+    );
+  }
+  const pre = ['-NoProfile', '-NonInteractive'];
+  if (IS_WIN) pre.push('-ExecutionPolicy', 'Bypass');
+  return runInterpreted(cmd, pre, '.ps1', code, opts);
+}
+
+/**
+ * Run a bash command the way your terminal would.
  * `bash -lc` gives you a login shell, so PATH, aliases and $HOME behave like a
  * normal Kali terminal. We deliberately do NOT give you a full TTY (see README)
  * — interactive programs like vim or less will not work here, by design.
+ *
+ * On Linux we re-export a composed PATH inside the command, because /etc/profile
+ * can discard it (see the note above composedPath). On Windows, bash comes from
+ * Git for Windows and manages its own POSIX-style PATH; injecting a Windows PATH
+ * string would only corrupt it, so there we just run the command as-is — and if
+ * bash is not installed, execute() returns a clean 127 the toolchain banner
+ * explains.
  */
 const runShell = (command, opts) =>
-  execute('bash', ['-lc', `export PATH=${JSON.stringify(composedPath())}; ${command}`], opts);
+  IS_WIN
+    ? execute('bash', ['-lc', command], opts)
+    : execute('bash', ['-lc', `export PATH=${JSON.stringify(composedPath())}; ${command}`], opts);
 
-/** Probe which interpreters exist, so the UI can warn instead of failing weirdly. */
+const firstLine = (r) => (r.stdout || r.stderr || '').trim().split('\n')[0];
+
+/**
+ * Probe which interpreters exist, so the UI can warn instead of failing weirdly.
+ * Each language is probed through the SAME command an exercise will actually run
+ * — resolving `py -3` vs `python3`, `pwsh` vs `powershell` — so the banner can
+ * never claim a tool is present that a lesson then fails to find.
+ */
 async function probeToolchain() {
-  const checks = {
-    python3: 'python3 --version',
-    node: 'node --version',
-    bash: 'bash --version | head -1',
-    git: 'git --version',
-  };
   const out = {};
-  for (const [name, cmd] of Object.entries(checks)) {
-    // Probe through runShell, NOT execute() directly, so the banner reports the
-    // exact interpreter an exercise will actually get. Probing a different way
-    // than you execute is how a UI ends up confidently wrong.
-    const r = await runShell(cmd, { timeout: 5000 });
-    out[name] = { available: r.exitCode === 0, version: (r.stdout || r.stderr).trim().split('\n')[0] };
+
+  const py = await pythonCmd();
+  if (py) {
+    const [bin, ...pre] = py.split(' ');
+    const r = await execute(bin, [...pre, '--version'], { timeout: 5000 });
+    out.python = { available: r.exitCode === 0, version: firstLine(r), cmd: py };
+  } else {
+    out.python = { available: false, version: '', cmd: null };
   }
+
+  {
+    const r = await execute('node', ['--version'], { timeout: 5000 });
+    out.node = { available: r.exitCode === 0, version: firstLine(r) };
+  }
+
+  const ps = await powershellCmd();
+  if (ps) {
+    const r = await execute(ps, ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'], { timeout: 8000 });
+    out.powershell = { available: r.exitCode === 0, version: firstLine(r), cmd: ps };
+  } else {
+    out.powershell = { available: false, version: '', cmd: null };
+  }
+
+  {
+    // bash is probed the way it runs: a login shell on Linux, plain on Windows.
+    const r = await runShell(IS_WIN ? 'bash --version' : 'bash --version | head -1', { timeout: 5000 });
+    out.bash = { available: r.exitCode === 0, version: firstLine(r) };
+  }
+
+  {
+    const r = await execute('git', ['--version'], { timeout: 5000 });
+    out.git = { available: r.exitCode === 0, version: firstLine(r) };
+  }
+
   return out;
 }
 
@@ -317,6 +463,7 @@ module.exports = {
   runPython,
   runNode,
   runShell,
+  runPowerShell,
   execute,
   probeToolchain,
   ensureWorkspace,

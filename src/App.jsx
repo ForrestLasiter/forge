@@ -24,10 +24,11 @@ export default function App() {
   // One effect for one job: load everything the app needs, once.
   useEffect(() => {
     (async () => {
-      const [curriculum, prog, tools] = await Promise.all([
+      const [curriculum, prog, tools, platform] = await Promise.all([
         window.forge.curriculum(),
         window.forge.progress.get(),
         window.forge.toolchain(),
+        window.forge.platform(),
       ]);
       setTracks(curriculum);
       setProgress(prog);
@@ -39,7 +40,13 @@ export default function App() {
         setTrackId(last.trackId);
         setLessonId(last.lessonId);
       } else {
-        setLessonId(curriculum[0].lessons[0].id);
+        // First launch: open the shell track native to this OS — PowerShell on
+        // Windows, the Kali/bash track on Linux — so the first thing you see is
+        // something that actually runs here.
+        const preferred = platform === 'win32' ? 'powershell' : 'linux';
+        const start = curriculum.find((t) => t.id === preferred) || curriculum[0];
+        setTrackId(start.id);
+        setLessonId(start.lessons[0].id);
       }
     })();
   }, []);
@@ -117,6 +124,7 @@ export default function App() {
                 className={`track-tab${t.id === trackId ? ' active' : ''}`}
                 style={{ '--tab-colour': t.colour }}
                 onClick={() => openLesson(t.id, t.lessons[0].id)}
+                aria-current={t.id === trackId ? 'true' : undefined}
                 title={t.blurb}
               >
                 {t.title}
@@ -127,7 +135,15 @@ export default function App() {
         </div>
         <span className="spacer" />
         <span className="stat">{stats.done} / {stats.total} exercises</span>
-        <div className="progress-bar" title={`${stats.done} of ${stats.total}`}>
+        <div
+          className="progress-bar"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={stats.total}
+          aria-valuenow={stats.done}
+          aria-valuetext={`${stats.done} of ${stats.total} exercises complete`}
+          aria-label="Overall progress"
+        >
           <div style={{ width: `${stats.total ? (stats.done / stats.total) * 100 : 0}%` }} />
         </div>
         <button className="ghost" onClick={() => window.forge.workspace.open()} title="Open ~/.forge/workspace in your file manager">
@@ -143,20 +159,26 @@ export default function App() {
       </div>
 
       <div className="body">
-        <aside className="sidebar">
-          <h4>{track.title}</h4>
+        <aside className="sidebar" aria-label="Lessons">
+          <h2>{track.title}</h2>
           {track.lessons.map((l, i) => (
             <button
               key={l.id}
               className={`lesson-link${l.id === lesson.id ? ' active' : ''}`}
               onClick={() => openLesson(track.id, l.id)}
+              aria-current={l.id === lesson.id ? 'true' : undefined}
             >
-              <span className="num">{String(i + 1).padStart(2, '0')}</span>
+              <span className="num" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
               <span className="name">
                 {l.title}
                 <div className="meta">{l.minutes} min · {l.exercises.length} exercise{l.exercises.length === 1 ? "" : "s"}</div>
               </span>
-              {lessonDone(track, l) && <span className="tick">✓</span>}
+              {lessonDone(track, l) && (
+                <>
+                  <span className="tick" aria-hidden="true">✓</span>
+                  <span className="sr-only">(completed)</span>
+                </>
+              )}
             </button>
           ))}
         </aside>
@@ -165,9 +187,11 @@ export default function App() {
           <div className="main-inner">
             {missing.length > 0 && (
               <div className="banner">
-                Not found on this machine: <strong>{missing.join(', ')}</strong>. Exercises in those
-                languages will fail until you install them — on Kali,
-                <code> sudo apt install python3 nodejs</code>.
+                Not found on this machine: <strong>{missing.join(', ')}</strong>. Exercises that
+                need them are skipped until you install them — the other tracks still work. See
+                the README's install notes for your OS ({' '}
+                <code>bash</code> ships with Git for Windows; <code>powershell</code> means
+                PowerShell 7, <code>pwsh</code>).
               </div>
             )}
 
@@ -179,7 +203,7 @@ export default function App() {
 
             <Markdown>{lesson.body}</Markdown>
 
-            {lesson.exercises.length > 0 && <div className="exercises-head">Your turn</div>}
+            {lesson.exercises.length > 0 && <h2 className="exercises-head">Your turn</h2>}
 
             {lesson.exercises.map((ex, i) => (
               <Exercise

@@ -1,0 +1,51 @@
+name: Build installers
+
+# Builds the double-click installers for Windows and Linux with electron-builder.
+# Runs on a version tag (v1.2.3) and on demand. It does NOT publish anywhere — it
+# uploads the installers as workflow artifacts you download from the run page, so
+# there is no signing secret or store account to configure.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os == 'windows-latest' && 'Windows (.exe)' || 'Linux (AppImage + .deb)' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+          - os: ubuntu-latest
+            script: dist:linux
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the installer
+        run: npm run ${{ matrix.script }}
+
+      # The installers land in release/. Grab the finished artifacts and skip the
+      # build metadata (unpacked trees, blockmaps, yml) that electron-builder also
+      # writes there.
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            release/*.exe
+            release/*.AppImage
+            release/*.deb

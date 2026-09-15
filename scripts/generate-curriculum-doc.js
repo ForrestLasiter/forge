@@ -79,15 +79,17 @@ out.push('Exercise kinds: ' +
     .map(([k, n]) => `${n} ${KIND_NAME[k] || k}`)
     .join(' · '));
 out.push('');
-out.push('The tracks are ordered deliberately. Linux first, because everything else runs');
-out.push('on it. Python next, because most of the tooling around you is written in it.');
-out.push('Then JavaScript, because React needs it. Then React. You can jump around, but');
-out.push('later tracks assume the earlier ones.');
+out.push('The tracks are ordered deliberately. The Linux shell first, because everything');
+out.push('else runs on it, with PowerShell alongside it as the cross-platform counterpart.');
+out.push('Python next, because most of the tooling around you is written in it. Then');
+out.push('JavaScript, because React needs it. Then React. You can jump around, but later');
+out.push('tracks assume the earlier ones.');
 out.push('');
-out.push('All four tracks share one dataset — a small fake SSH auth log in your sandbox.');
-out.push('You solve the same log-triage problem as a shell pipeline, then in Python, then');
-out.push('in Node. Seeing one problem in three languages is the fastest way to tell what');
-out.push('is *language* and what is *programming*.');
+out.push('The shell, PowerShell, Python and Node tracks share one dataset — a small fake');
+out.push('SSH auth log in your workspace. You solve the same log-triage problem four ways.');
+out.push('Seeing one problem in four languages is the fastest way to tell what is');
+out.push('*language* and what is *programming*. Forge runs on Windows and Linux, and so do');
+out.push('both shells — PowerShell 7 on Linux, bash on Windows via Git for Windows.');
 out.push('');
 
 for (const track of lessons.tracks) {

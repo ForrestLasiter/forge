@@ -91,6 +91,36 @@ const child = spawn(command, args, { cwd, detached: true });
 process.kill(-child.pid, 'SIGKILL');   // the minus sign is the whole trick
 ```
 
+Windows has no process groups to signal this way, so there the same job is done
+with `taskkill /pid <pid> /T /F` — `/T` walks the child's whole tree, `/F` forces
+it. `detached` is POSIX-only and stays off on Windows. Same guarantee (a runaway
+and its children die as a unit), two mechanisms.
+
+### Cross-platform: one runner, two operating systems
+
+Forge runs on Windows and Linux, and almost all of `runner.js` is shared. The
+parts that cannot be branch on `process.platform`:
+
+- **Interpreter names are resolved, not assumed.** Python is `python3` on Linux,
+  but on Windows that exact name is a Microsoft Store stub that opens the Store
+  instead of running Python — so there Forge tries `py -3` and `python` first.
+  PowerShell resolves to `pwsh` (PowerShell 7, cross-platform) when present and
+  falls back to Windows PowerShell 5.1 (`powershell`) otherwise. Each language is
+  probed through the very command it will run with, so the toolchain banner can
+  never claim a tool is present that a lesson then fails to find.
+- **PATH is composed from OS-appropriate directories** — the version-manager dirs
+  on Linux, the Program Files / LOCALAPPDATA install locations on Windows.
+- **bash keeps its own PATH on Windows.** On Linux, Forge re-exports a composed
+  PATH inside the command because `/etc/profile` can discard it; on Windows, bash
+  comes from Git for Windows and manages a POSIX-style PATH, so injecting a
+  Windows PATH string would only corrupt it.
+
+The bash/Kali track is tagged `platform: 'linux'`: the app still shows it on
+Windows (a Windows user with Git Bash can take it, and anyone can read it), but
+the verifier skips it off Linux rather than failing on Unix-only tools like `ip`.
+The PowerShell track has no such tag, because `pwsh` makes it run on both — the
+mirror image, so you can learn either shell on either OS.
+
 ### Caps and timeouts
 
 - **10 second timeout**, then SIGKILL. A `while True:` in an exercise is a normal

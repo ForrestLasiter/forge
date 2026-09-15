@@ -93,12 +93,12 @@ export default function Exercise({ trackId, lessonId, exercise, index, completed
   }
 
   return (
-    <div className={`exercise${passed ? ' passed' : ''}`}>
+    <div className={`exercise${passed ? ' passed' : ''}`} role="group" aria-label={`Exercise ${index + 1}`}>
       <div className="exercise-head">
         <span className="label">Exercise {index + 1}</span>
         <span className="kind">{KIND_LABEL[exercise.kind] || exercise.kind}</span>
         <span className="spacer" />
-        {passed && <span className="tick">✓ passed</span>}
+        {passed && <span className="tick"><span aria-hidden="true">✓</span> passed</span>}
       </div>
 
       <div className="exercise-body">
@@ -115,12 +115,15 @@ export default function Exercise({ trackId, lessonId, exercise, index, completed
               return (
                 <button key={i} className={cls} onClick={() => answerQuiz(i)} disabled={choice !== null && verdict?.pass}>
                   {String.fromCharCode(65 + i)}. {c}
+                  {choice === i && verdict && (
+                    <span className="sr-only">{verdict.pass ? ' — correct answer' : ' — incorrect answer'}</span>
+                  )}
                 </button>
               );
             })}
             {choice !== null && verdict && (
-              <div className={`verdict ${verdict.pass ? 'pass' : 'fail'}`}>
-                <span>{verdict.pass ? '✓' : '✗'}</span>
+              <div className={`verdict ${verdict.pass ? 'pass' : 'fail'}`} role="status">
+                <span aria-hidden="true">{verdict.pass ? '✓' : '✗'}</span>
                 <span>{verdict.message}</span>
               </div>
             )}
@@ -130,7 +133,7 @@ export default function Exercise({ trackId, lessonId, exercise, index, completed
           </>
         ) : (
           <>
-            <Editor value={code} onChange={setCode} kind={exercise.kind} minHeight="130px" />
+            <Editor value={code} onChange={setCode} kind={exercise.kind} minHeight="130px" label={`Code editor for exercise ${index + 1}`} />
 
             <div className="controls">
               {exercise.kind !== 'react' && (
@@ -181,8 +184,8 @@ export default function Exercise({ trackId, lessonId, exercise, index, completed
             )}
 
             {verdict && (
-              <div className={`verdict ${verdict.pass ? 'pass' : 'fail'}`}>
-                <span>{verdict.pass ? '✓' : '✗'}</span>
+              <div className={`verdict ${verdict.pass ? 'pass' : 'fail'}`} role="status">
+                <span aria-hidden="true">{verdict.pass ? '✓' : '✗'}</span>
                 <span>{verdict.message}</span>
               </div>
             )}
